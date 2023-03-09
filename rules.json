@@ -1,0 +1,29 @@
+{
+    "rules": [
+        {
+            "name": "Can get my checkins",
+            "steps": [
+                {
+                    "name": "make request",
+                    "action": "webrequest",
+                    "connection": {
+                        "url": "${baseurl}/checkins",
+                        "method": "get",
+                        "queryparams": [],
+                        "headers": []
+                    }
+                },
+                {
+                    "name": "verify we have an array of checkins",
+                    "action": "get array count"
+                }
+            ]
+        }
+    ],
+    "vars": {
+        "baseurl": {
+            "type": "constant",
+            "value": "http://localhost:8080/blend/v1"
+        }
+    }
+}
