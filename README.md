@@ -1,4 +1,4 @@
-# verify.me
+# jcanary
 
 Take in a JSON config and perform verification of web server functionality.
 
