@@ -7,15 +7,29 @@
                     "name": "make request",
                     "action": "webrequest",
                     "connection": {
-                        "url": "${baseurl}/checkins",
+                        "url": "${baseurl}/checkins?userId=${userId}",
                         "method": "get",
                         "queryparams": [],
-                        "headers": []
+                        "headers": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ]
                     }
                 },
                 {
                     "name": "verify we have an array of checkins",
-                    "action": "get array count"
+                    "action": "equals",
+                    "stepRef": 0,  
+                    "leftOperand": {
+                        "type": "reference",
+                        "val": "statusCode"
+                    },
+                    "rightOperand": {
+                        "type": "constant",
+                        "val": 200
+                    }
                 }
             ]
         }
@@ -23,7 +37,15 @@
     "vars": {
         "baseurl": {
             "type": "constant",
-            "value": "http://localhost:8080/blend/v1"
+            "value": "https://blendapi-production.up.railway.app/blend/v1"
+        },
+        "userId": {
+            "type": "constant",
+            "value": "USR_rE2KRTORaL1QHOH"
+        },
+        "someEnvVar": {
+            "type": "env",
+            "value": "MY_ENV_VAR"
         }
     }
 }
