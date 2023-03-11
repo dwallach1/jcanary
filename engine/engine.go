@@ -6,14 +6,14 @@ import (
 
 	"jcanary/engine/rules"
 	"jcanary/engine/rules/operators"
-	"jcanary/interoperator"
+	"jcanary/interpreter"
 
 	"github.com/Jeffail/gabs"
 )
 
 type Config struct {
 	Rules []rules.Rule `json:"rules"`
-	Vars  interoperator.VariableBag
+	Vars  interpreter.VariableBag
 }
 
 func New(rawconfig *gabs.Container) (*Config, error) {
@@ -63,8 +63,8 @@ func New(rawconfig *gabs.Container) (*Config, error) {
 	}, nil
 }
 
-func parseVars(vars map[string]interface{}) interoperator.VariableBag {
-	bag := interoperator.VariableBag{}
+func parseVars(vars map[string]interface{}) interpreter.VariableBag {
+	bag := interpreter.VariableBag{}
 	for k, v := range vars {
 
 		varconfig := v.(map[string]interface{})

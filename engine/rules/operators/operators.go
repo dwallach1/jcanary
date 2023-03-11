@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"jcanary/interoperator"
+	"jcanary/interpreter"
 	"net/http"
 	"reflect"
 	"strings"
@@ -35,7 +35,7 @@ type OperatorT interface {
 }
 
 type Operator interface {
-	Operate(interoperator.VariableBag, *[]*Result) *Result
+	Operate(interpreter.VariableBag, *[]*Result) *Result
 }
 
 func New(t OperatorType, operatorConfig map[string]interface{}) (Operator, error) {
@@ -63,7 +63,7 @@ func New(t OperatorType, operatorConfig map[string]interface{}) (Operator, error
 
 type NilOperator struct{}
 
-func (o *NilOperator) Operate(varBag interoperator.VariableBag, pipeline *[]*Result) *Result {
+func (o *NilOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Result) *Result {
 	return nil
 }
 
@@ -85,16 +85,16 @@ type HttpRequestOperator struct {
 	} `json:"connection"`
 }
 
-func (o *HttpRequestOperator) Operate(varBag interoperator.VariableBag, pipeline *[]*Result) *Result {
+func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Result) *Result {
 	var result Result
 	httpclient := &http.Client{
 		Timeout: time.Second * 30,
 	}
 	var body io.Reader
 	if o.Connection.Body != "" {
-		body = strings.NewReader(interoperator.BuildString(o.Connection.Body, varBag))
+		body = strings.NewReader(interpreter.BuildString(o.Connection.Body, varBag))
 	}
-	url := interoperator.BuildString(o.Connection.Url, varBag)
+	url := interpreter.BuildString(o.Connection.Url, varBag)
 	method := strings.ToUpper(o.Connection.Method)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
@@ -102,12 +102,12 @@ func (o *HttpRequestOperator) Operate(varBag interoperator.VariableBag, pipeline
 		return &result
 	}
 	for _, header := range o.Connection.Headers {
-		req.Header.Add(header.Key, interoperator.BuildString(header.Val, varBag))
+		req.Header.Add(header.Key, interpreter.BuildString(header.Val, varBag))
 	}
 
 	q := req.URL.Query()
 	for _, qparam := range o.Connection.QueryParams {
-		q.Add(qparam.Key, interoperator.BuildString(qparam.Val, varBag))
+		q.Add(qparam.Key, interpreter.BuildString(qparam.Val, varBag))
 	}
 	req.URL.RawQuery = q.Encode()
 
@@ -141,8 +141,26 @@ func (o *HttpRequestOperator) Operate(varBag interoperator.VariableBag, pipeline
 }
 
 type Operand struct {
-	Type string      `json:"type"`
-	Val  interface{} `json:"val"`
+	Type  string      `json:"type"`
+	Dtype string      `json:"dtype"`
+	Val   interface{} `json:"val"`
+}
+
+func (o *Operand) buildRefs(ref *Result) {
+	if o.Type == "reference" {
+		path := o.Val.(string)
+		val := ref.Container.Path(path).Data()
+		o.Val = val
+	}
+}
+
+func (o *Operand) normalize() {
+	val := o.Val
+	switch o.Dtype {
+	case "int":
+		val = int(o.Val.(float64))
+	}
+	o.Val = val
 }
 
 type EqualsOperator struct {
@@ -152,20 +170,14 @@ type EqualsOperator struct {
 	RightOperand Operand      `json:"rightOperand"`
 }
 
-func (o *EqualsOperator) Operate(varBag interoperator.VariableBag, pipeline *[]*Result) *Result {
+func (o *EqualsOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Result) *Result {
 	var result Result
-
-	right := o.RightOperand.Val
-	left := o.LeftOperand.Val
-	if o.RightOperand.Type == "reference" {
-		path := right.(string)
-		right = (*pipeline)[o.StepRef].Container.Path(path).Data()
-	}
-	if o.LeftOperand.Type == "reference" {
-		path := left.(string)
-		left = (*pipeline)[o.StepRef].Container.Path(path).Data()
-	}
-	res := reflect.DeepEqual(right, left)
+	pipelineInput := (*pipeline)[o.StepRef]
+	o.RightOperand.buildRefs(pipelineInput)
+	o.LeftOperand.buildRefs(pipelineInput)
+	o.LeftOperand.normalize()
+	o.RightOperand.normalize()
+	res := reflect.DeepEqual(o.RightOperand.Val, o.LeftOperand.Val)
 	m := make(map[string]interface{})
 	m["result"] = res
 	container, err := gabs.Consume(m)
@@ -173,7 +185,10 @@ func (o *EqualsOperator) Operate(varBag interoperator.VariableBag, pipeline *[]*
 		result.Err = fmt.Errorf("failed to consume container: %w", err)
 		return &result
 	}
-	fmt.Printf(" -> Equals Operation: < %v > == < %v > resulted in %v\n", left, right, res)
+	fmt.Printf(" -> Equals Operation: < %v [T: %T]> == < %v [T: %T]> resulted in %v\n",
+		o.LeftOperand.Val, o.LeftOperand.Val,
+		o.RightOperand.Val, o.RightOperand.Val,
+		res)
 	result.Container = container
 	return &result
 }
