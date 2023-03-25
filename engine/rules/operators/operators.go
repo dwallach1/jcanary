@@ -12,13 +12,15 @@ import (
 
 	"github.com/Jeffail/gabs"
 	"github.com/mitchellh/mapstructure"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type OperatorType string
 
 const (
-	WebRequestOperator OperatorType = "webrequest"
-	EqualsOperatorType OperatorType = "equals"
+	WebRequestOperator     OperatorType = "webrequest"
+	EqualsOperatorType     OperatorType = "equals"
+	SchematizeOperatorType OperatorType = "schematize"
 )
 
 type Result struct {
@@ -30,12 +32,14 @@ func (r Result) HasError() bool {
 	return r.Err != nil
 }
 
-type OperatorT interface {
-	HttpRequestOperator | EqualsOperator | ArrayGetOperator
-}
-
 type Operator interface {
 	Operate(interpreter.VariableBag, *[]*Result) *Result
+}
+
+func Print(s string, args ...interface{}) {
+	str := fmt.Sprintf(s, args...)
+
+	fmt.Printf("\t\t\t%v\n", str)
 }
 
 func New(t OperatorType, operatorConfig map[string]interface{}) (Operator, error) {
@@ -44,7 +48,7 @@ func New(t OperatorType, operatorConfig map[string]interface{}) (Operator, error
 		var op HttpRequestOperator
 		err := mapstructure.Decode(operatorConfig, &op)
 		if err != nil {
-			fmt.Printf("unable to initalize webrequest operator: %v", err)
+			Print("unable to initalize webrequest operator: %v", err)
 			return &NilOperator{}, err
 		}
 		return &op, nil
@@ -52,7 +56,15 @@ func New(t OperatorType, operatorConfig map[string]interface{}) (Operator, error
 		var op EqualsOperator
 		err := mapstructure.Decode(operatorConfig, &op)
 		if err != nil {
-			fmt.Printf("unable to initalize equals operator: %v", err)
+			Print("unable to initalize equals operator: %v", err)
+			return &NilOperator{}, err
+		}
+		return &op, nil
+	case SchematizeOperatorType:
+		var op SchematizeOperator
+		err := mapstructure.Decode(operatorConfig, &op)
+		if err != nil {
+			Print("unable to initalize equals operator: %v", err)
 			return &NilOperator{}, err
 		}
 		return &op, nil
@@ -111,7 +123,7 @@ func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *
 	}
 	req.URL.RawQuery = q.Encode()
 
-	fmt.Printf("invoking url: %v\n", url)
+	Print("invoking url: %v", url)
 
 	resp, err := httpclient.Do(req)
 	if err != nil {
@@ -127,9 +139,9 @@ func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *
 	}
 	m["statusCode"] = resp.StatusCode
 	m["responseBody"] = responseBody
-	fmt.Printf(" -> HTTP Operation: %v::%v < statuscode: %v > \n", method, url, resp.StatusCode)
+	Print("HTTP Operation: %v::%v < statuscode: %v >", method, url, resp.StatusCode)
 	if resp.StatusCode > 399 {
-		fmt.Printf("body: %v\n", responseBody)
+		Print("body: %v\n", responseBody)
 	}
 	container, err := gabs.Consume(m)
 	if err != nil {
@@ -185,7 +197,7 @@ func (o *EqualsOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Re
 		result.Err = fmt.Errorf("failed to consume container: %w", err)
 		return &result
 	}
-	fmt.Printf(" -> Equals Operation: < %v [T: %T]> == < %v [T: %T]> resulted in %v\n",
+	Print("Equals Operation: < %v [T: %T]> == < %v [T: %T]> resulted in %v",
 		o.LeftOperand.Val, o.LeftOperand.Val,
 		o.RightOperand.Val, o.RightOperand.Val,
 		res)
@@ -193,4 +205,33 @@ func (o *EqualsOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Re
 	return &result
 }
 
-type ArrayGetOperator struct{}
+type SchematizeOperator struct {
+	Type    OperatorType           `json:"type"`
+	StepRef int                    `json:"stepRef"`
+	Path    string                 `json:"path"`
+	Schema  map[string]interface{} `json:"schema"`
+}
+
+func (o *SchematizeOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Result) *Result {
+	var result Result
+	resultStringToTest := (*pipeline)[o.StepRef].Container.String()
+	schemaLoader := gojsonschema.NewGoLoader(o.Schema)
+	documentLoader := gojsonschema.NewStringLoader(resultStringToTest)
+	res, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		result.Err = fmt.Errorf("failed to perform schema validation: %w", err)
+		return &result
+	}
+	if res.Valid() {
+		Print("The document is valid according to input schema\n")
+	} else {
+		errStrs := []string{}
+		for _, desc := range res.Errors() {
+			errStrs = append(errStrs, fmt.Sprintf("- %s", desc))
+		}
+		e := fmt.Errorf("object does not conform to schema: %v", strings.Join(errStrs, ", "))
+		Print(e.Error())
+		result.Err = e
+	}
+	return &result
+}

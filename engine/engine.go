@@ -24,7 +24,6 @@ func New(rawconfig *gabs.Container) (*Config, error) {
 	// @TODO: this can cause nil pointer exceptions.. fix later
 	ruleContainer := configMap["rules"].Data()
 	var myrules []rules.Rule
-	fmt.Println(ruleContainer)
 	rawRules, ok := ruleContainer.([]interface{})
 	if !ok {
 		return nil, errors.New("invalid rules object in config")

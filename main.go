@@ -9,12 +9,14 @@ import (
 	"jcanary/engine/rules/operators"
 
 	"github.com/Jeffail/gabs"
+	"github.com/fatih/color"
 )
 
 var RULES_CONFIG = getEnvVar("RULES_CONFIG", "./rules.json")
 
 func main() {
-	fmt.Println("running jcanary...")
+	c := color.New(color.FgCyan).Add(color.Underline)
+	c.Println("running jcanary...")
 
 	// parse rules file
 	// os.load RULES_CONFIG
@@ -26,18 +28,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to create engine instance: %v", err)
 	}
-	println(conf)
 	pipeline := []*operators.Result{}
 	for r, rule := range conf.Rules {
-		fmt.Printf("processing rule #%v\n", r)
+		c.Printf("\tprocessing rule #%v\n", r)
 		for s, step := range rule.Steps {
-			fmt.Printf("processing step #%v\n", s)
+			c.Printf("\t\tprocessing step #%v\n", s)
 			res := step.Operate(conf.Vars, &pipeline)
-			fmt.Printf("res -> %v\n", res)
 			pipeline = append(pipeline, res)
 		}
 	}
-	fmt.Println("finished running jcanary ")
+	state := "success"
+	for _, res := range pipeline {
+		if res.HasError() {
+			state = "failure"
+		}
+	}
+	fmt.Printf("finished running jcanary. Final state: %v\n", state)
 }
 
 func getEnvVar(key, fallback string) string {

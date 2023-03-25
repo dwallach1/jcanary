@@ -1,2 +1,4 @@
 rules.json
-jcanary
+**/jcanary
+node_modules
+lib
