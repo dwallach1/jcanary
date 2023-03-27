@@ -12,6 +12,7 @@ type SchematizeOperator struct {
 	Type       OperatorType           `json:"type"`
 	StepRef    int                    `json:"stepRef"`
 	Path       string                 `json:"path"`
+	Debug      bool                   `json:"debug"`
 	RootSchema map[string]interface{} `json:"rootSchema"`
 }
 
@@ -30,7 +31,9 @@ func (o *SchematizeOperator) Operate(varBag interpreter.VariableBag, pipeline *[
 		result.Err = err
 		return &result
 	}
-
+	if o.Debug {
+		Print(resultStringToTest)
+	}
 	document := gojsonschema.NewStringLoader(resultStringToTest)
 	res, err := schema.Validate(document)
 	if err != nil {
