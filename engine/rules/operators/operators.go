@@ -12,7 +12,6 @@ import (
 
 	"github.com/Jeffail/gabs"
 	"github.com/mitchellh/mapstructure"
-	"github.com/xeipuuv/gojsonschema"
 )
 
 type OperatorType string
@@ -202,36 +201,5 @@ func (o *EqualsOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Re
 		o.RightOperand.Val, o.RightOperand.Val,
 		res)
 	result.Container = container
-	return &result
-}
-
-type SchematizeOperator struct {
-	Type    OperatorType           `json:"type"`
-	StepRef int                    `json:"stepRef"`
-	Path    string                 `json:"path"`
-	Schema  map[string]interface{} `json:"schema"`
-}
-
-func (o *SchematizeOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Result) *Result {
-	var result Result
-	resultStringToTest := (*pipeline)[o.StepRef].Container.String()
-	schemaLoader := gojsonschema.NewGoLoader(o.Schema)
-	documentLoader := gojsonschema.NewStringLoader(resultStringToTest)
-	res, err := gojsonschema.Validate(schemaLoader, documentLoader)
-	if err != nil {
-		result.Err = fmt.Errorf("failed to perform schema validation: %w", err)
-		return &result
-	}
-	if res.Valid() {
-		Print("The document is valid according to input schema\n")
-	} else {
-		errStrs := []string{}
-		for _, desc := range res.Errors() {
-			errStrs = append(errStrs, fmt.Sprintf("- %s", desc))
-		}
-		e := fmt.Errorf("object does not conform to schema: %v", strings.Join(errStrs, ", "))
-		Print(e.Error())
-		result.Err = e
-	}
 	return &result
 }
