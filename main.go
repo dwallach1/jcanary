@@ -44,6 +44,9 @@ func main() {
 		}
 	}
 	fmt.Printf("finished running jcanary. Final state: %v\n", state)
+	if state == "failure" {
+		os.Exit(1)
+	}
 }
 
 func getEnvVar(key, fallback string) string {
