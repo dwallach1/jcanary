@@ -18,6 +18,8 @@ func main() {
 	c := color.New(color.FgCyan).Add(color.Underline)
 	c.Println("running jcanary...")
 
+	errPrinter := color.New(color.FgRed)
+
 	// parse rules file
 	// os.load RULES_CONFIG
 	rawConfig, err := gabs.ParseJSONFile(RULES_CONFIG)
@@ -34,6 +36,9 @@ func main() {
 		for s, step := range rule.Steps {
 			c.Printf("\t\tprocessing step #%v\n", s)
 			res := step.Operate(conf.Vars, &pipeline)
+			if res.HasError() {
+				errPrinter.Printf("\t\t\tstep #%v failed: %v\n", s, res.Err)
+			}
 			pipeline = append(pipeline, res)
 		}
 	}
