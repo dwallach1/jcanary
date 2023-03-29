@@ -1,16 +1,6 @@
 
 #!/usr/bin/env python
-"""
-Very simple HTTP server in python.
-Usage::
-    ./dummy-web-server.py [<port>]
-Send a GET request::
-    curl http://localhost
-Send a HEAD request::
-    curl -I http://localhost
-Send a POST request::
-    curl -d "foo=bar&bin=baz" http://localhost
-"""
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import sys
 
@@ -24,14 +14,14 @@ class S(BaseHTTPRequestHandler):
     def do_GET(self):
         self._set_headers()
         self.wfile.write(b"""{
-    "activity": "Go swimming with a friend",
-    "type": "social",
-    "participants": 2,
-    "price": 0.1,
-    "link": "",
-    "key": "1505028",
-    "accessibility": 0.1
-}""")
+            "activity": "Go swimming with a friend",
+            "type": "social",
+            "participants": 2,
+            "price": 0.1,
+            "link": "",
+            "key": "1505028",
+            "accessibility": 0.1
+        }""")
 
     def do_HEAD(self):
         self._set_headers()

@@ -1,9 +1,9 @@
 package operators
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"jcanary/interpreter"
 	"net/http"
 	"reflect"
@@ -82,9 +82,9 @@ func (o *NilOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Resul
 type HttpRequestOperator struct {
 	Type       OperatorType `json:"type"`
 	Connection struct {
-		Url     string `json:"url"`
-		Method  string `json:"method"`
-		Body    string `json:"body"`
+		Url     string                 `json:"url"`
+		Method  string                 `json:"method"`
+		Body    map[string]interface{} `json:"body"`
 		Headers []struct {
 			Key string `json:"key"`
 			Val string `json:"val"`
@@ -101,13 +101,14 @@ func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *
 	httpclient := &http.Client{
 		Timeout: time.Second * 30,
 	}
-	var body io.Reader
-	if o.Connection.Body != "" {
-		body = strings.NewReader(interpreter.BuildString(o.Connection.Body, varBag))
+	b := new(bytes.Buffer)
+	if len(o.Connection.Body) > 0 {
+		json.NewEncoder(b).Encode(o.Connection.Body)
+		// body = strings.NewReader(interpreter.BuildString(o.Connection.Body, varBag))
 	}
 	url := interpreter.BuildString(o.Connection.Url, varBag)
 	method := strings.ToUpper(o.Connection.Method)
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequest(method, url, b)
 	if err != nil {
 		result.Err = fmt.Errorf("unable to create request: %w", err)
 		return &result
@@ -122,7 +123,7 @@ func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *
 	}
 	req.URL.RawQuery = q.Encode()
 
-	Print("invoking url: %v", url)
+	Print("Invoking url: %v:%v", method, url)
 
 	resp, err := httpclient.Do(req)
 	if err != nil {
@@ -138,7 +139,7 @@ func (o *HttpRequestOperator) Operate(varBag interpreter.VariableBag, pipeline *
 	}
 	m["statusCode"] = resp.StatusCode
 	m["responseBody"] = responseBody
-	Print("HTTP Operation: %v::%v < statuscode: %v >", method, url, resp.StatusCode)
+	Print("HTTP Operation: < statuscode: %v >", resp.StatusCode)
 	if resp.StatusCode > 399 {
 		Print("body: %v\n", responseBody)
 	}
@@ -201,5 +202,8 @@ func (o *EqualsOperator) Operate(varBag interpreter.VariableBag, pipeline *[]*Re
 		o.RightOperand.Val, o.RightOperand.Val,
 		res)
 	result.Container = container
+	if !res {
+		result.Err = fmt.Errorf("comparison failed")
+	}
 	return &result
 }
