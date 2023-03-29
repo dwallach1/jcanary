@@ -11,40 +11,9 @@ Take in a JSON config and perform verification of web server functionality.
 uses https://github.com/Jeffail/gabs.
 
 
-TODO:
-
-- [ ] dockerize
-https://github.com/peter-evans/docker-compose-actions-workflow
 
 ## Action Types
 
 ## Variables
 * `constant`
 * `env`
-
-
-
-```yml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v3
-      -
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      -
-        name: Build webserver to test
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          tags: integrationtests/myservice:latest
-      -
-        name: Run integration tests against webserver
-        uses: dwallach1/jcanary@v1
-        with:
-          webserver_docker_img: integrationtests/myservice:latest
-```

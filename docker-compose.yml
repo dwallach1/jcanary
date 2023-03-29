@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  mockwebserver:
+    image: mockwebserver
+    build:
+      dockerfile: ./Dockerfile
+      context: ./example
+    ports:
+      - "80:80"
+  
+  jcanary:
+    image: davidwallach/jcanary
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    # entrypoint: ls
+    volumes:
+      - ./example/rules.json:/app/jcanary.json
+    environment:
+      - RULES_CONFIG=./jcanary.json
+    depends_on:
+      - mockwebserver
